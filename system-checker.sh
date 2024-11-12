@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/bin/bash
 #
 #          _nnnn_
 #         dGGGGMMb
