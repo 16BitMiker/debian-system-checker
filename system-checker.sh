@@ -164,10 +164,10 @@ large log files~~~sudo journalctl --disk-usage && echo "Largest Journal Files:" 
 lynis audit~~~sudo lynis audit system --quick --report-file -
 failed ssh logins~~~sudo journalctl -u ssh --no-pager | grep "Failed password" | tail -n 20
 setuid files~~~timeout 30s sudo find /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -type f -perm -4000 -ls 2>/dev/null | sort -k11 | tail -n 25
-ssh login attempts~~~sudo grep "sshd" /var/log/auth.log | grep -E "Failed|Accepted" | tail -n 20
-ssh connection summary~~~sudo grep "sshd" /var/log/auth.log | grep -E "Failed|Accepted" | awk '{print $1,$2,$3,$9,$11}' | sort | uniq -c | sort -nr | head -n 10
-failed ssh ips~~~sudo grep "sshd" /var/log/auth.log | grep "Failed password" | awk '{print $11}' | sort | uniq -c | sort -nr | head -n 10
-successful ssh logins~~~sudo grep "sshd" /var/log/auth.log | grep "Accepted" | tail -n 10
+ssh login attempts~~~sudo journalctl -u ssh --no-pager | grep -E "Failed|Accepted" | tail -n 20
+ssh connection summary~~~sudo journalctl -u ssh --no-pager | grep -E "Failed|Accepted" | awk '{print $1,$2,$3,$9,$11}' | sort | uniq -c | sort -nr | head -n 10
+failed ssh ips~~~sudo journalctl -u ssh --no-pager | grep "Failed password" | awk '{print $11}' | sort | uniq -c | sort -nr | head -n 10
+successful ssh logins~~~sudo journalctl -u ssh --no-pager | grep "Accepted" | tail -n 10
 ssh config~~~sudo grep -v "^#" /etc/ssh/sshd_config | grep -v "^$"
 ssh ports~~~sudo ss -tlnp | grep sshd
 ssh sessions~~~w -h || who || echo "No active sessions"
@@ -175,6 +175,7 @@ ssh sessions~~~w -h || who || echo "No active sessions"
 # File System Monitoring
 recent system changes~~~sudo journalctl --no-pager | grep "/etc" | grep "WRITE" | tail -n 25
 modified etc files~~~sudo find /etc -type f -mtime -1 | tail -n 25
+
 
 
 END
