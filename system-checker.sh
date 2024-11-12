@@ -45,6 +45,9 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 	$choice =~ m~[BQE]~i ? bye() : ();
 	goto MENU unless $choice =~ m~^[0-9]+$~;
 	run( $choice ) if $$db[$choice];
+	
+	printf qq|> %s. |, q|Press enter to continue|;
+	<STDIN>;
 	goto MENU;
     
 	# ~~~~~~~~~~~~~~~~~~~~~~ SUBS
@@ -102,14 +105,27 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 		border();
 		say q|Main Menu: q(uit)|;
 		border();
-		for my $key (keys @{$db})
+		
+		$i = 0;
+		map 
 		{
-			printf qq|%-2d - %s%s%s\n|
-			, $key
-			, YELLOW BOLD q||
-			, keys %{$$db[$key]}
-			, RESET q||;
-		}
+			unless (m~^#~)
+			{
+				printf qq|%-2d - %s%s%s\n|
+				, $i++
+				, YELLOW BOLD q||
+				, s`~~~.*$``r
+				, RESET q||;
+			}
+			else
+			{
+				s~^\# ~~;
+				say WHITE UNDERLINE $_, RESET;
+			}
+		} 
+		grep 
+		{ !m~^$~ } split m~\n~, $cmds;
+		
 		border();
 	}
 
@@ -118,13 +134,13 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 # System Overview and Performance
 system load~~~uptime
 disk usage~~~df -h
-running services~~~systemctl list-units --type=service --state=running
+running services~~~sudo systemctl list-units --type=service --state=running
 mounted filesystems~~~mount | column -t
 
 # User and Group Information
 show groups & users~~~perl -nl -E 'BEGIN { printf qq|%s%s%s\n|, q|Group|, q| |x6, q|Users| }' -E '($group, $user) = m~^(sudo|www-data).+:\K(.*)$~g; if ($group) { printf qq|%8s = %s\n|, $group, $user =~ s~,\K~ ~gr }' /etc/group
 current users~~~who
-recent logins~~~last -n 20
+recent logins~~~sudo journalctl -u systemd-logind --no-pager | grep "New session" | tail -n 20
 empty passwords~~~sudo awk -F: '($2 == "") {print $1}' /etc/shadow
 
 # Process Monitoring
@@ -135,23 +151,31 @@ high memory processes~~~ps aux --sort=-%mem | head -n 11
 open network connections~~~sudo lsof -i
 listening ports~~~sudo ss -tulpn
 established connections~~~sudo ss -tan state established
-active connections~~~netstat -tunapl | grep ESTABLISHED | tail -n 25
+active connections~~~sudo journalctl -u systemd-networkd --no-pager | grep "ESTABLISHED" | tail -n 25
 
 # Log Analysis and System Events
 logcheck~~~sudo -u logcheck logcheck -o -t | tail -n 25
-logwatch~~~sudo logwatch --output stdout --format text --detail high --range All --service All | grep -E 'error|warning|critical|failed|failure|alert'
-journal errors~~~journalctl -p err..alert --since "1 hour ago" | tail -n 25
-system events~~~sudo dmesg -w | tail -n 25
-large log files~~~sudo find /var/log -type f -size +50M -exec ls -lh {} \; | sort -rh | head -n 10
+logwatch~~~sudo logwatch --output stdout --format text --detail high --range Today --encode none --numeric --service All | grep -E 'error|warning|critical|failed|failure|alert|denied|refused|violation|attack' | sort | uniq -c | sort -rn | head -n 50
+journal errors~~~sudo journalctl -p err..alert --since "1 hour ago" --no-pager | tail -n 25
+system events~~~sudo journalctl -k --no-pager | tail -n 25
+large log files~~~sudo journalctl --disk-usage && echo "Largest Journal Files:" && sudo du -ah /var/log/journal/ | sort -rh | head -n 10 && echo "Oldest Entry:" && sudo journalctl --reverse --output=short-precise | tail -n 1 && echo "Newest Entry:" && sudo journalctl --output=short-precise | tail -n 1 && echo "Journal Configuration:" && sudo journalctl -u systemd-journald | grep -E 'Runtime journal|System journal' | tail -n 2
 
 # Security and Intrusion Detection
-lynis audit~~~sudo lynis audit system
-failed ssh logins~~~sudo grep "Failed password" /var/log/auth.log | tail -n 20
-setuid files~~~sudo find / -type f -perm -4000 2>/dev/null | tail -n 25
+lynis audit~~~sudo lynis audit system --quick --report-file -
+failed ssh logins~~~sudo journalctl -u ssh --no-pager | grep "Failed password" | tail -n 20
+setuid files~~~timeout 30s sudo find /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -type f -perm -4000 -ls 2>/dev/null | sort -k11 | tail -n 25
+ssh login attempts~~~sudo grep "sshd" /var/log/auth.log | grep -E "Failed|Accepted" | tail -n 20
+ssh connection summary~~~sudo grep "sshd" /var/log/auth.log | grep -E "Failed|Accepted" | awk '{print $1,$2,$3,$9,$11}' | sort | uniq -c | sort -nr | head -n 10
+failed ssh ips~~~sudo grep "sshd" /var/log/auth.log | grep "Failed password" | awk '{print $11}' | sort | uniq -c | sort -nr | head -n 10
+successful ssh logins~~~sudo grep "sshd" /var/log/auth.log | grep "Accepted" | tail -n 10
+ssh config~~~sudo grep -v "^#" /etc/ssh/sshd_config | grep -v "^$"
+ssh ports~~~sudo ss -tlnp | grep sshd
+ssh sessions~~~w -h || who || echo "No active sessions"
 
 # File System Monitoring
-recent system changes~~~sudo find /etc -type f -mtime -1 -ls
+recent system changes~~~sudo journalctl --no-pager | grep "/etc" | grep "WRITE" | tail -n 25
 modified etc files~~~sudo find /etc -type f -mtime -1 | tail -n 25
+
 
 END
 )"
