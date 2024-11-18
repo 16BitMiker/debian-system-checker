@@ -48,6 +48,8 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 	
 	my $output_file = q|output/log_|.time().q|.txt|;
 	
+	system q|mkdir -p ./output|;
+	
 	open my $fh, q|>|, $output_file or 
 	do { say q|>|, RED BOLD q|File write fail!|, RESET; bye() }; 
 	print $fh $output_file;
