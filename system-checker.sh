@@ -44,7 +44,15 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 	goto MENU if $choice =~ m~^$~;
 	$choice =~ m~[BQE]~i ? bye() : ();
 	goto MENU unless $choice =~ m~^[0-9]+$~;
-	run( $choice ) if $$db[$choice];
+	my $output = run( $choice ) if $$db[$choice];
+	
+	my $output_file = q|output/log_|.time().q|.txt|;
+	
+	open my $fh, q|>|, $output_file or 
+	do { say q|>|, RED BOLD q|File write fail!|, RESET; bye() }; 
+	print $fh $output_file;
+	close $fh;
+	msg( qq|Output saved: ${output_file}| );
 	
 	printf qq|> %s. |, q|Press enter to continue|;
 	<STDIN>;
@@ -54,15 +62,29 @@ perl -MTerm::ANSIColor=:constants -MData::Dumper -sE'
 	
 	sub run
 	{
-		my $key = shift;
-		my ($cmd) = values %{$$db[$key]};
-		msg( $cmd );
-		system $cmd;
-		if ($?)
-		{
-			msg( qq|Command failed! ${!}|, q|RED| );
-			bye();
-		}
+	    my $key = shift;
+	    my ($cmd) = values %{$$db[$key]};
+	    msg( $cmd );
+	    
+	    open( my $pipe, q(-|), $cmd ) or die "Cannot open pipe: $!";
+	    
+	    my $output = q();
+	    while (my $line = <$pipe>) 
+	    {
+	        print $line;  # Display output on the screen
+	        $output .= $line;  # Append to the output variable
+	    }
+	    
+	    close($pipe);
+	    my $exit_status = $? >> 8;
+	    
+	    if ($exit_status != 0)
+	    {
+	        msg( qq|Command failed! Exit status: $exit_status|, q|RED| );
+	        bye();
+	    }
+	    
+	    return $output;  # Return the captured output
 	}
 	
 	sub bye
